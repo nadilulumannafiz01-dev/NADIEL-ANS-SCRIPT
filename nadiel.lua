@@ -2,9 +2,13 @@ local RS=game:GetService("RunService")
 local GS=game:GetService("GuiService")
 local UIS=game:GetService("UserInputService")
 local VIM=game:GetService("VirtualInputManager")
+local Stats=game:GetService("Stats")
 local lp=game:GetService("Players").LocalPlayer
 local pg=lp:WaitForChild("PlayerGui")
 if _G.AWC then pcall(_G.AWC) end
+
+local VERSION="v1.0.0"
+local START=os.clock()
 
 local S={auto=true,latency=0.06,fly=false,vert=0,speed=60,slot=1,max=4}
 local cps,conns,bv={}, {}, nil
@@ -12,8 +16,12 @@ local function bind(sig,fn) local c=sig:Connect(fn) conns[#conns+1]=c return c e
 local function isPress(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
 local function isMove(i) return i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch end
 
-local C={bg=Color3.fromRGB(22,22,27),side=Color3.fromRGB(27,27,33),row=Color3.fromRGB(38,38,45),
-	acc=Color3.fromRGB(30,144,255),txt=Color3.fromRGB(235,235,240),sub=Color3.fromRGB(150,150,162),off=Color3.fromRGB(70,70,80)}
+-- Tema: Dark Navy + Electric Blue
+local C={
+	bg=Color3.fromRGB(10,14,26), side=Color3.fromRGB(13,19,36), row=Color3.fromRGB(20,28,50),
+	acc=Color3.fromRGB(0,140,255), txt=Color3.fromRGB(232,238,250), sub=Color3.fromRGB(128,142,170),
+	off=Color3.fromRGB(52,64,92), offTxt=Color3.fromRGB(110,122,150), line=Color3.fromRGB(30,50,95),
+}
 
 local function new(cls,props,parent)
 	local o=Instance.new(cls)
@@ -37,17 +45,16 @@ if not pcall(function() gui.Parent=(gethui and gethui()) or game:GetService("Cor
 local W,H=460,270
 local main=new("Frame",{Size=UDim2.new(0,W,0,H),Position=UDim2.new(0.5,-W/2,0.5,-H/2),BackgroundColor3=C.bg,Active=true,ClipsDescendants=true},gui)
 round(main,12)
-new("UIStroke",{Color=Color3.fromRGB(60,60,70),Thickness=1},main)
+new("UIStroke",{Color=C.line,Thickness=1},main)
 
 local head=new("Frame",{Size=UDim2.new(1,0,0,44),BackgroundTransparency=1},main)
 label(head,"▲",18,UDim2.new(0,14,0,0),UDim2.new(0,24,1,0),C.acc,Enum.Font.GothamBold)
-label(head,"Nadiel x Claude",14,UDim2.new(0,42,0,6),UDim2.new(0,200,0,18),C.txt,Enum.Font.GothamBold)
-label(head,"Auto Workout Hub",11,UDim2.new(0,42,0,24),UDim2.new(0,200,0,14),C.sub)
+label(head,"Nadiel Hub",14,UDim2.new(0,42,0,6),UDim2.new(0,200,0,18),C.txt,Enum.Font.GothamBold)
+label(head,"by Nadiel x Claude",11,UDim2.new(0,42,0,24),UDim2.new(0,200,0,14),C.sub)
 
 local function headBtn(text,x)
-	local b=new("TextButton",{Text=text,TextSize=16,Font=Enum.Font.GothamBold,TextColor3=C.sub,BackgroundTransparency=1,
+	return new("TextButton",{Text=text,TextSize=16,Font=Enum.Font.GothamBold,TextColor3=C.sub,BackgroundTransparency=1,
 		Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,x,0,7)},head)
-	return b
 end
 local bMin=headBtn("–",-72)
 local bClose=headBtn("✕",-38)
@@ -90,10 +97,10 @@ end)
 local pages,tabBtns={}, {}
 local function addTab(name,order)
 	local b=new("TextButton",{Text=name,TextSize=12,Font=Enum.Font.GothamMedium,TextColor3=C.sub,BackgroundColor3=C.row,
-		BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),LayoutOrder=order,AutoButtonColor=false},tabList)
+		BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),LayoutOrder=order,AutoButtonColor=false},tabList)
 	round(b,8)
 	local p=new("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,
-		CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false},content)
+		ScrollBarImageColor3=C.acc,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false},content)
 	new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},p)
 	new("UIPadding",{PaddingTop=UDim.new(0,8),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,12),PaddingBottom=UDim.new(0,8)},p)
 	label(p,name,15,UDim2.new(),UDim2.new(1,0,0,22),C.txt,Enum.Font.GothamBold).LayoutOrder=0
@@ -165,7 +172,7 @@ local function button(page,title,desc,text,cb)
 	return b
 end
 
-local function holdRow(page,title,desc,cbUp,cbDown)
+local function holdRow(page,title,desc)
 	local r=base(page,title,desc)
 	local function hb(text,x,v)
 		local b=new("TextButton",{Text=text,TextSize=11,Font=Enum.Font.GothamBold,TextColor3=Color3.new(1,1,1),
@@ -181,18 +188,82 @@ end
 ----------------------------------------------------------------
 -- HALAMAN
 ----------------------------------------------------------------
-local pAuto=addTab("Automatic",1)
-local pFly=addTab("Fly",2)
-local pCP=addTab("Checkpoint",3)
-local pSet=addTab("Settings",4)
+local pDash=addTab("Dashboard",1)
+local pAuto=addTab("Automatic",2)
+local pFly=addTab("Fly",3)
+local pCP=addTab("Checkpoint",4)
+local pSet=addTab("Settings",5)
 
 local function hrp() return lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") end
 
--- Automatic
+----------------------------------------------------------------
+-- DASHBOARD
+----------------------------------------------------------------
+do
+	local hd=new("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=C.row,LayoutOrder=1},pDash)
+	round(hd,8)
+	local bar=new("Frame",{Size=UDim2.new(0,3,1,-16),Position=UDim2.new(0,8,0,8),BackgroundColor3=C.acc,BorderSizePixel=0},hd)
+	round(bar,2)
+	label(hd,"NADIEL HUB",16,UDim2.new(0,20,0,7),UDim2.new(1,-30,0,22),C.acc,Enum.Font.GothamBold)
+	label(hd,"Auto Workout • by Nadiel x Claude",10,UDim2.new(0,20,0,29),UDim2.new(1,-30,0,14),C.sub)
+
+	local grid=new("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,LayoutOrder=2},pDash)
+	new("UIGridLayout",{CellSize=UDim2.new(0.5,-3,0,46),CellPadding=UDim2.new(0,6,0,6),SortOrder=Enum.SortOrder.LayoutOrder},grid)
+
+	local function card(title,order)
+		local c=new("Frame",{BackgroundColor3=C.row,LayoutOrder=order},grid)
+		round(c,8)
+		label(c,title,10,UDim2.new(0,10,0,5),UDim2.new(1,-14,0,12),C.sub)
+		return label(c,"N/A",15,UDim2.new(0,10,0,20),UDim2.new(1,-14,0,20),C.txt,Enum.Font.GothamBold)
+	end
+
+	local vAuto=card("AUTO CLICK",1)
+	local vFly=card("FLY",2)
+	local vFps=card("FPS",3)
+	local vPing=card("PING",4)
+	local vUp=card("UPTIME",5)
+	local vVer=card("VERSION",6)
+	vVer.Text=VERSION
+
+	local function setState(lbl,on)
+		lbl.Text=on and "ON" or "OFF"
+		lbl.TextColor3=on and C.acc or C.offTxt
+	end
+
+	local function getPing()
+		local ok,v=pcall(function() return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+		if ok and type(v)=="number" then return math.floor(v+0.5).." ms" end
+		return "N/A"
+	end
+
+	-- 1 koneksi saja, update tiap 0.5 dtk, hanya saat tab Dashboard terlihat
+	local frames,acc=0,0
+	bind(RS.Heartbeat,function(dt)
+		frames+=1
+		acc+=dt
+		if acc<0.5 then return end
+		local fps=frames/acc
+		frames,acc=0,0
+		if not (pDash.Visible and body.Visible) then return end
+
+		vFps.Text=fps>0 and tostring(math.floor(fps+0.5)) or "N/A"
+		vPing.Text=getPing()
+		local up=math.floor(os.clock()-START)
+		vUp.Text=string.format("%02d:%02d:%02d",up//3600,(up%3600)//60,up%60)
+		setState(vAuto,S.auto)
+		setState(vFly,S.fly)
+	end)
+end
+
+----------------------------------------------------------------
+-- AUTOMATIC
+----------------------------------------------------------------
 toggle(pAuto,"Auto Click","Klik tepat di tengah zona hijau",true,function(v) S.auto=v setStatus(v and "Auto ON" or "Auto OFF") end)
 slider(pAuto,"Latency (ms)","Naikkan jika klik telat",0,150,60,function(v) S.latency=v/1000 end)
 
--- Fly
+----------------------------------------------------------------
+-- FLY
+----------------------------------------------------------------
 local function stopFly()
 	S.fly=false S.vert=0
 	if bv then bv:Destroy() bv=nil end
@@ -221,7 +292,9 @@ bind(RS.Heartbeat,function()
 	end
 end)
 
--- Checkpoint
+----------------------------------------------------------------
+-- CHECKPOINT
+----------------------------------------------------------------
 local slotBtn
 slotBtn=button(pCP,"Slot Aktif","Tekan untuk ganti slot (1-"..S.max..")","Slot 1",function(b)
 	S.slot=S.slot%S.max+1
@@ -245,22 +318,24 @@ button(pCP,"Teleport","Otomatis lanjut ke CP berikutnya","TP CP",function()
 	end
 end)
 
--- Settings
+----------------------------------------------------------------
+-- SETTINGS & UNLOAD
+----------------------------------------------------------------
 button(pSet,"Tutup Script","Hapus UI dan matikan semua fitur","UNLOAD",function() if _G.AWC then _G.AWC() end end)
-
 bClose.MouseButton1Click:Connect(function() if _G.AWC then _G.AWC() end end)
 
 _G.AWC=function()
 	stopFly()
 	for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+	table.clear(conns)
 	gui:Destroy()
 	_G.AWC=nil
 end
 
 -- tab pertama aktif
-pages["Automatic"].Visible=true
-tabBtns["Automatic"].BackgroundTransparency=0
-tabBtns["Automatic"].TextColor3=C.txt
+pDash.Visible=true
+tabBtns["Dashboard"].BackgroundTransparency=0
+tabBtns["Dashboard"].TextColor3=C.txt
 
 ----------------------------------------------------------------
 -- AUTO CLICK
