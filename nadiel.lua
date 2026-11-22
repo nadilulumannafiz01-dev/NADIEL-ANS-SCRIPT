@@ -7,8 +7,9 @@ local lp=game:GetService("Players").LocalPlayer
 local pg=lp:WaitForChild("PlayerGui")
 if _G.AWC then pcall(_G.AWC) end
 
-local VERSION="v1.0.0"
+local VERSION="v1.1.0"
 local START=os.clock()
+local alive=true
 
 local S={auto=true,latency=0.06,fly=false,vert=0,speed=60,slot=1,max=4}
 local cps,conns,bv={}, {}, nil
@@ -16,7 +17,6 @@ local function bind(sig,fn) local c=sig:Connect(fn) conns[#conns+1]=c return c e
 local function isPress(i) return i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch end
 local function isMove(i) return i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch end
 
--- Tema: Dark Navy + Electric Blue
 local C={
 	bg=Color3.fromRGB(10,14,26), side=Color3.fromRGB(13,19,36), row=Color3.fromRGB(20,28,50),
 	acc=Color3.fromRGB(0,140,255), txt=Color3.fromRGB(232,238,250), sub=Color3.fromRGB(128,142,170),
@@ -71,7 +71,6 @@ local function setStatus(t) statusLbl.Text=t end
 
 local content=new("Frame",{Position=UDim2.new(0,124,0,0),Size=UDim2.new(1,-124,1,0),BackgroundTransparency=1},body)
 
--- drag jendela
 do
 	local drag,ds,sp
 	head.InputBegan:Connect(function(i) if isPress(i) then drag,ds,sp=true,i.Position,main.Position end end)
@@ -192,7 +191,8 @@ local pDash=addTab("Dashboard",1)
 local pAuto=addTab("Automatic",2)
 local pFly=addTab("Fly",3)
 local pCP=addTab("Checkpoint",4)
-local pSet=addTab("Settings",5)
+local pObby=addTab("Obby",5)
+local pSet=addTab("Settings",6)
 
 local function hrp() return lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") end
 
@@ -236,7 +236,6 @@ do
 		return "N/A"
 	end
 
-	-- 1 koneksi saja, update tiap 0.5 dtk, hanya saat tab Dashboard terlihat
 	local frames,acc=0,0
 	bind(RS.Heartbeat,function(dt)
 		frames+=1
@@ -293,7 +292,7 @@ bind(RS.Heartbeat,function()
 end)
 
 ----------------------------------------------------------------
--- CHECKPOINT
+-- CHECKPOINT (manual)
 ----------------------------------------------------------------
 local slotBtn
 slotBtn=button(pCP,"Slot Aktif","Tekan untuk ganti slot (1-"..S.max..")","Slot 1",function(b)
@@ -319,12 +318,126 @@ button(pCP,"Teleport","Otomatis lanjut ke CP berikutnya","TP CP",function()
 end)
 
 ----------------------------------------------------------------
+-- OBBY: AUTO FINISH
+----------------------------------------------------------------
+local autoFinish,useCP,gap,stepWait,running=false,true,5,0.4,false
+local finishCF
+local FKEYS={"finish","selesai","goal","garis"}
+local CKEYS={"checkpoint","stage"}
+
+local function nameHas(o,keys)
+	local n=o.Name:lower()
+	local pn=o.Parent and o.Parent.Name:lower() or ""
+	for _,k in ipairs(keys) do
+		if n:find(k,1,true) or pn:find(k,1,true) then return true end
+	end
+	return false
+end
+
+local function numOf(o)
+	return tonumber(o.Name:match("%d+")) or tonumber((o.Parent and o.Parent.Name or ""):match("%d+")) or math.huge
+end
+
+local function scanObby()
+	local list,fin={},nil
+	local char=lp.Character
+	for _,o in ipairs(workspace:GetDescendants()) do
+		if o:IsA("BasePart") and not (char and o:IsDescendantOf(char)) then
+			if nameHas(o,FKEYS) then
+				if not fin or o:FindFirstChildOfClass("TouchTransmitter") then fin=o end
+			elseif nameHas(o,CKEYS) then
+				list[#list+1]=o
+			end
+		end
+	end
+	table.sort(list,function(a,b) return numOf(a)<numOf(b) end)
+	return list,fin
+end
+
+local function tpTo(part)
+	local r=hrp()
+	if not (r and part and part.Parent) then return false end
+	r.CFrame=part.CFrame+Vector3.new(0,3,0)
+	r.AssemblyLinearVelocity=Vector3.zero
+	if firetouchinterest then
+		pcall(function()
+			firetouchinterest(r,part,0)
+			firetouchinterest(r,part,1)
+		end)
+	end
+	return true
+end
+
+local function runObby(manual)
+	if running then return end
+	running=true
+	local list,fin=scanObby()
+	local function go() return alive and (manual or autoFinish) end
+
+	if useCP then
+		for i,p in ipairs(list) do
+			if not go() then running=false return end
+			setStatus("CP "..i.."/"..#list)
+			tpTo(p)
+			task.wait(stepWait)
+		end
+	end
+
+	if go() then
+		if finishCF then
+			local r=hrp()
+			if r then
+				r.CFrame=finishCF
+				r.AssemblyLinearVelocity=Vector3.zero
+				setStatus("Ke finish (manual)")
+			end
+		elseif fin then
+			tpTo(fin)
+			setStatus("Ke finish")
+		else
+			setStatus("Finish tidak ketemu")
+		end
+	end
+	running=false
+end
+
+toggle(pObby,"Auto Finish","Selesaikan obby berulang otomatis",false,function(v)
+	autoFinish=v
+	setStatus(v and "Auto Finish ON" or "Auto Finish OFF")
+end)
+toggle(pObby,"Lewati Checkpoint","Kunjungi CP berurutan sebelum finish",true,function(v) useCP=v end)
+slider(pObby,"Jeda Ulang (dtk)","Jarak antar putaran",2,20,5,function(v) gap=v end)
+button(pObby,"Selesai Sekarang","Jalankan satu putaran","GO",function() task.spawn(runObby,true) end)
+button(pObby,"Set Finish Manual","Simpan posisimu sebagai finish","SET",function()
+	local r=hrp()
+	if r then finishCF=r.CFrame setStatus("Finish tersimpan") end
+end)
+button(pObby,"Reset Finish","Kembali ke deteksi otomatis","RESET",function()
+	finishCF=nil
+	setStatus("Finish direset")
+end)
+
+task.spawn(function()
+	while alive do
+		if autoFinish and not running then
+			runObby(false)
+			local t0=os.clock()
+			while alive and autoFinish and os.clock()-t0<gap do task.wait(0.2) end
+		else
+			task.wait(0.3)
+		end
+	end
+end)
+
+----------------------------------------------------------------
 -- SETTINGS & UNLOAD
 ----------------------------------------------------------------
 button(pSet,"Tutup Script","Hapus UI dan matikan semua fitur","UNLOAD",function() if _G.AWC then _G.AWC() end end)
 bClose.MouseButton1Click:Connect(function() if _G.AWC then _G.AWC() end end)
 
 _G.AWC=function()
+	alive=false
+	autoFinish=false
 	stopFly()
 	for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 	table.clear(conns)
@@ -332,7 +445,6 @@ _G.AWC=function()
 	_G.AWC=nil
 end
 
--- tab pertama aktif
 pDash.Visible=true
 tabBtns["Dashboard"].BackgroundTransparency=0
 tabBtns["Dashboard"].TextColor3=C.txt
